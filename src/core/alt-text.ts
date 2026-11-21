@@ -10,6 +10,21 @@ export const generatedAltTextSchema = z.object({
 
 export type GeneratedAltText = z.infer<typeof generatedAltTextSchema>;
 
+/** Everything an image-description request can contain: the crop plus bounded page text. */
+export interface ImageDescriptionInput {
+  page: Pick<PageContext, "title" | "description">;
+  image: Pick<ImageAuditItem, "nearbyText" | "isInteractive" | "width" | "height">;
+  imageDataUrl: string;
+}
+
+export interface AltTextContext {
+  pageTitle: string;
+  pageDescription: string;
+  nearbyText: string;
+  interactive: boolean;
+  intrinsicSize: string;
+}
+
 export class InvalidGeneratedAltTextError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
@@ -20,17 +35,23 @@ export class InvalidGeneratedAltTextError extends Error {
 const normalizeUntrustedText = (value: string): string =>
   value.replace(/\s+/gu, " ").trim().slice(0, maxContextLength);
 
+/** The exact page text sent with an image; also shown to the user before any cloud request. */
+export const buildAltTextContext = (
+  page: ImageDescriptionInput["page"],
+  image: ImageDescriptionInput["image"],
+): AltTextContext => ({
+  pageTitle: normalizeUntrustedText(page.title),
+  pageDescription: normalizeUntrustedText(page.description),
+  nearbyText: normalizeUntrustedText(image.nearbyText),
+  interactive: image.isInteractive,
+  intrinsicSize: `${image.width}x${image.height}`,
+});
+
 export const buildAltTextPrompt = (
-  page: Pick<PageContext, "title" | "description">,
-  image: Pick<ImageAuditItem, "nearbyText" | "isInteractive" | "width" | "height">,
+  page: ImageDescriptionInput["page"],
+  image: ImageDescriptionInput["image"],
 ): string => {
-  const context = {
-    pageTitle: normalizeUntrustedText(page.title),
-    pageDescription: normalizeUntrustedText(page.description),
-    nearbyText: normalizeUntrustedText(image.nearbyText),
-    interactive: image.isInteractive,
-    intrinsicSize: `${image.width}x${image.height}`,
-  };
+  const context = buildAltTextContext(page, image);
 
   return [
     "You are an accessibility specialist writing concise English alt text.",

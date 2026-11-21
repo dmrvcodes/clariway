@@ -6,9 +6,14 @@ import vm from "node:vm";
 import { Window } from "happy-dom";
 import {
   InvalidGeneratedAltTextError,
+  buildAltTextContext,
   buildAltTextPrompt,
   parseGeneratedAltText,
 } from "../src/core/alt-text.ts";
+import {
+  describeOnDeviceFirst,
+  grantCloudConsent,
+} from "../src/core/hybrid-routing.ts";
 import { calculateCropRegion } from "../src/core/image-crop.ts";
 
 const manifest = JSON.parse(await readFile("dist/manifest.json", "utf8"));
@@ -384,4 +389,84 @@ assert.throws(
   InvalidGeneratedAltTextError,
 );
 
-console.log("Clariway build, hybrid image, media accessibility, and reversible DOM checks passed.");
+// The consent card shows exactly the normalized text the model would receive.
+assert.deepEqual(
+  buildAltTextContext(
+    { title: "  Winter \n jackets ", description: "" },
+    { nearbyText: "x".repeat(900), isInteractive: true, width: 640, height: 480 },
+  ),
+  {
+    pageTitle: "Winter jackets",
+    pageDescription: "",
+    nearbyText: "x".repeat(800),
+    interactive: true,
+    intrinsicSize: "640x480",
+  },
+);
+
+// Hybrid routing: on-device first; failure never reaches the cloud by itself.
+let onDeviceCalls = 0;
+const runOnDevice = async () => {
+  onDeviceCalls += 1;
+  return "local description";
+};
+assert.deepEqual(
+  await describeOnDeviceFirst(
+    { deviceReady: false, error: new Error("Local LanguageModel API not available in this environment.") },
+    runOnDevice,
+  ),
+  {
+    kind: "needs-cloud-consent",
+    reason: "device-unavailable",
+    detail: "Local LanguageModel API not available in this environment.",
+  },
+);
+assert.equal(onDeviceCalls, 0);
+assert.deepEqual(await describeOnDeviceFirst({ deviceReady: true }, runOnDevice), {
+  kind: "described",
+  result: "local description",
+});
+assert.equal(onDeviceCalls, 1);
+assert.deepEqual(
+  await describeOnDeviceFirst({ deviceReady: true }, async () => {
+    throw new Error("The on-device prompt failed.");
+  }),
+  { kind: "needs-cloud-consent", reason: "device-failed", detail: "The on-device prompt failed." },
+);
+
+// Consent carries a frozen copy of only the approved fields.
+const consentSource = {
+  page: { title: "Shop", description: "Jackets", mainText: "Full page text stays local" },
+  image: {
+    nearbyText: "Red jacket",
+    isInteractive: false,
+    width: 320,
+    height: 240,
+    source: "https://example.test/jacket.jpg",
+  },
+  imageDataUrl: "data:image/png;base64,AAAA",
+};
+const consent = grantCloudConsent(consentSource, 1_700_000_000_000);
+assert.deepEqual(consent.input, {
+  page: { title: "Shop", description: "Jackets" },
+  image: { nearbyText: "Red jacket", isInteractive: false, width: 320, height: 240 },
+  imageDataUrl: "data:image/png;base64,AAAA",
+});
+assert.equal(consent.grantedAt, 1_700_000_000_000);
+assert.ok(Object.isFrozen(consent));
+assert.ok(Object.isFrozen(consent.input));
+assert.ok(Object.isFrozen(consent.input.page));
+assert.ok(Object.isFrozen(consent.input.image));
+consentSource.page.title = "Changed after consent";
+assert.equal(consent.input.page.title, "Shop");
+
+// Image inference must not use SDK modes that cross the device boundary on their own.
+const aiSource = await readFile("src/firebase/ai.ts", "utf8");
+assert.doesNotMatch(aiSource, /InferenceMode\.PREFER_(ON_DEVICE|IN_CLOUD)/);
+assert.match(aiSource, /InferenceMode\.ONLY_ON_DEVICE/);
+assert.match(aiSource, /InferenceMode\.ONLY_IN_CLOUD/);
+assert.match(aiSource, /\(globalThis as \{ LanguageModel\?: unknown \}\)\.LanguageModel/);
+// On-device inference uses an app instance that never initializes App Check.
+assert.match(aiSource, /getAI\(onDeviceFirebaseApp,/);
+
+console.log("Clariway build, consent-gated hybrid routing, media accessibility, and reversible DOM checks passed.");

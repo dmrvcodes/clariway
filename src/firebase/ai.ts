@@ -4,6 +4,7 @@ import {
   GoogleAIBackend,
   InferenceMode,
   Schema,
+  type AI,
   type GenerativeModel,
   type InferenceSource,
   type Part,
@@ -12,10 +13,11 @@ import {
   buildAltTextPrompt,
   parseGeneratedAltText,
   type GeneratedAltText,
+  type ImageDescriptionInput,
 } from "../core/alt-text";
-import type { ImageAuditItem, PageContext } from "../core/messages";
+import type { CloudConsent, DevicePreparation } from "../core/hybrid-routing";
 import { ensureAppCheck } from "./app-check";
-import { firebaseApp } from "./app";
+import { firebaseApp, onDeviceFirebaseApp } from "./app";
 
 export type InferencePreference = "on-device" | "in-cloud";
 
@@ -24,23 +26,11 @@ export interface TextProbeResult {
   source: InferenceSource | "unknown";
 }
 
-export interface ImageDescriptionInput {
-  page: Pick<PageContext, "title" | "description">;
-  image: Pick<
-    ImageAuditItem,
-    "nearbyText" | "isInteractive" | "width" | "height"
-  >;
-  imageDataUrl: string;
-}
-
 export interface ImageDescriptionResult extends GeneratedAltText {
   source: InferenceSource | "unknown";
 }
 
-export interface DeviceModelPreparation {
-  deviceReady: boolean;
-  error?: Error;
-}
+const cloudModelName = "gemini-3.5-flash-lite";
 
 const altTextResponseSchema = Schema.object({
   properties: {
@@ -53,22 +43,39 @@ const altTextResponseSchema = Schema.object({
   },
 });
 
-let imageDescriptionModel: GenerativeModel | undefined;
+/**
+ * Firebase creates its on-device adapter only when Chrome's `LanguageModel`
+ * global is truthy. Without that adapter the SDK sends even `ONLY_ON_DEVICE`
+ * requests to the cloud, so fail closed with the same check.
+ */
+const assertOnDeviceRuntime = (): void => {
+  if (!(globalThis as { LanguageModel?: unknown }).LanguageModel) {
+    throw new Error("This browser does not expose Chrome's on-device Prompt API.");
+  }
+};
 
-const getImageDescriptionModel = (): GenerativeModel => {
-  if (imageDescriptionModel) return imageDescriptionModel;
-
+/**
+ * Cloud requests require App Check, initialized before the AI instance because
+ * Firebase AI Logic reads it once at creation. On-device inference uses its own
+ * app instance without App Check, so it works without that setup and never
+ * contacts Firebase.
+ */
+const getFirebaseAI = (preference: InferencePreference): AI => {
+  if (preference === "on-device") {
+    return getAI(onDeviceFirebaseApp, { backend: new GoogleAIBackend() });
+  }
   ensureAppCheck();
-  const ai = getAI(firebaseApp, { backend: new GoogleAIBackend() });
-  imageDescriptionModel = getGenerativeModel(ai, {
-    mode: InferenceMode.PREFER_ON_DEVICE,
-    inCloudParams: {
-      model: "gemini-3.5-flash-lite",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: altTextResponseSchema,
-      },
-    },
+  return getAI(firebaseApp, { backend: new GoogleAIBackend() });
+};
+
+let onDeviceImageModel: GenerativeModel | undefined;
+let cloudImageModel: GenerativeModel | undefined;
+
+/** Image descriptions on this device only. */
+const getOnDeviceImageModel = (): GenerativeModel => {
+  assertOnDeviceRuntime();
+  onDeviceImageModel ??= getGenerativeModel(getFirebaseAI("on-device"), {
+    mode: InferenceMode.ONLY_ON_DEVICE,
     onDeviceParams: {
       createOptions: {
         expectedInputs: [
@@ -82,17 +89,57 @@ const getImageDescriptionModel = (): GenerativeModel => {
       },
     },
   });
-  return imageDescriptionModel;
+  return onDeviceImageModel;
 };
 
-export const prepareImageDescriptionModel = async (
+/** Image descriptions in the cloud. Reachable only through describeImageInCloud(consent). */
+const getCloudImageModel = (): GenerativeModel => {
+  cloudImageModel ??= getGenerativeModel(getFirebaseAI("in-cloud"), {
+    mode: InferenceMode.ONLY_IN_CLOUD,
+    inCloudParams: {
+      model: cloudModelName,
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: altTextResponseSchema,
+      },
+    },
+  });
+  return cloudImageModel;
+};
+
+const pngDataUrlPrefix = "data:image/png;base64,";
+
+const buildImageParts = (input: Readonly<ImageDescriptionInput>): Part[] => {
+  if (!input.imageDataUrl.startsWith(pngDataUrlPrefix)) {
+    throw new Error("The image crop is not a valid PNG capture.");
+  }
+
+  const data = input.imageDataUrl.slice(pngDataUrlPrefix.length);
+  if (!data || !/^[A-Za-z0-9+/]+={0,2}$/u.test(data)) {
+    throw new Error("The image crop contains invalid image data.");
+  }
+
+  return [
+    { type: "text", text: buildAltTextPrompt(input.page, input.image) },
+    { type: "inlineData", inlineData: { mimeType: "image/png", data } },
+  ];
+};
+
+const toImageDescriptionResult = (
+  text: string,
+  source: InferenceSource | undefined,
+): ImageDescriptionResult => ({
+  ...parseGeneratedAltText(text),
+  source: source ?? "unknown",
+});
+
+export const prepareOnDeviceImageModel = async (
   onProgress?: (progress: number) => void,
-): Promise<DeviceModelPreparation> => {
+): Promise<DevicePreparation> => {
   try {
-    // The SDK call is intentionally reached before the first await so callers
-    // can invoke this directly inside a user gesture.
-    const initialization = getImageDescriptionModel().initializeDeviceModel(onProgress);
-    await initialization;
+    // The SDK call is reached before the first await, so callers can start it
+    // directly inside a user gesture. ONLY_ON_DEVICE throws when unavailable.
+    await getOnDeviceImageModel().initializeDeviceModel(onProgress);
     return { deviceReady: true };
   } catch (error: unknown) {
     return {
@@ -102,46 +149,32 @@ export const prepareImageDescriptionModel = async (
   }
 };
 
-export const describeImage = async (
+export const describeImageOnDevice = async (
   input: ImageDescriptionInput,
 ): Promise<ImageDescriptionResult> => {
-  const prefix = "data:image/png;base64,";
-  if (!input.imageDataUrl.startsWith(prefix)) {
-    throw new Error("The image crop is not a valid PNG capture.");
-  }
-
-  const data = input.imageDataUrl.slice(prefix.length);
-  if (!data || !/^[A-Za-z0-9+/]+={0,2}$/u.test(data)) {
-    throw new Error("The image crop contains invalid image data.");
-  }
-
-  const parts: Part[] = [
-    { type: "text", text: buildAltTextPrompt(input.page, input.image) },
-    { type: "inlineData", inlineData: { mimeType: "image/png", data } },
-  ];
-  const result = await getImageDescriptionModel().generateContent(parts);
-  const generated = parseGeneratedAltText(result.response.text());
-
-  return {
-    ...generated,
-    source: result.response.inferenceSource ?? "unknown",
-  };
+  const result = await getOnDeviceImageModel().generateContent(buildImageParts(input));
+  return toImageDescriptionResult(result.response.text(), result.response.inferenceSource);
 };
 
-const getInferenceMode = (preference: InferencePreference): InferenceMode =>
-  preference === "on-device"
-    ? InferenceMode.ONLY_ON_DEVICE
-    : InferenceMode.ONLY_IN_CLOUD;
+/** Sends exactly the payload the user approved, and nothing else. */
+export const describeImageInCloud = async (
+  consent: CloudConsent,
+): Promise<ImageDescriptionResult> => {
+  const result = await getCloudImageModel().generateContent(buildImageParts(consent.input));
+  return toImageDescriptionResult(result.response.text(), result.response.inferenceSource);
+};
 
 export const runTextProbe = async (
   preference: InferencePreference,
   onProgress?: (progress: number) => void,
 ): Promise<TextProbeResult> => {
-  ensureAppCheck();
-  const ai = getAI(firebaseApp, { backend: new GoogleAIBackend() });
-  const model = getGenerativeModel(ai, {
-    mode: getInferenceMode(preference),
-    inCloudParams: { model: "gemini-3.5-flash-lite" },
+  if (preference === "on-device") assertOnDeviceRuntime();
+  const model = getGenerativeModel(getFirebaseAI(preference), {
+    mode:
+      preference === "on-device"
+        ? InferenceMode.ONLY_ON_DEVICE
+        : InferenceMode.ONLY_IN_CLOUD,
+    inCloudParams: { model: cloudModelName },
   });
 
   if (preference === "on-device") await model.initializeDeviceModel(onProgress);

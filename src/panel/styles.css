@@ -279,14 +279,107 @@ dl {
 
 .source-badge {
   justify-self: start;
-  padding: 2px 6px;
+  padding: 2px 8px;
   border-radius: 999px;
   color: #f7f4ec;
   background: #276247;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.source-badge[data-source="in_cloud"] {
+  color: #2b1d00;
+  background: #ffcb6b;
+}
+
+.source-badge[data-source="unknown"] {
+  background: #61708a;
+}
+
+.generated-description .small-button.secondary {
+  margin-top: 0;
+}
+
+.cloud-consent {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 0.5rem;
+  padding: 0.65rem;
+  border: 2px solid #b7791f;
+  border-radius: 0.4rem;
+  color: #17211d;
+  background: #fff8e6;
+}
+
+.cloud-consent:focus-visible,
+.generated-description p:focus-visible {
+  outline: 3px solid #1b6cf0;
+  outline-offset: 2px;
+}
+
+.cloud-consent img {
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.cloud-consent > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cloud-consent p,
+.cloud-consent dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.cloud-consent summary {
+  color: #123d7a;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.cloud-consent dl {
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.cloud-consent dl div {
+  padding: 6px 8px;
+  border-color: #e3c27a;
+}
+
+.cloud-consent dt {
+  color: #6b4e00;
+}
+
+.cloud-consent dd {
+  color: #26364d;
+  font-size: 0.85rem;
+}
+
+.cloud-consent .consent-meta {
+  margin-top: 6px;
+  color: #43516a;
+  font-size: 0.8rem;
+}
+
+.consent-actions {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 6px;
+}
+
+.consent-actions .small-button.secondary {
+  margin-top: 0;
 }
 
 dl div {

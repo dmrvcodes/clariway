@@ -23,7 +23,9 @@ export const getEnglishVoices = async (): Promise<VoiceOption[]> => {
       voiceName: voice.voiceName,
       lang: voice.lang,
       remote: Boolean(voice.remote),
-    }));
+    }))
+    // Local voices first, so the default never sends page text to a network voice.
+    .sort((first, second) => Number(first.remote) - Number(second.remote));
 };
 
 export const speakEnglish = async (

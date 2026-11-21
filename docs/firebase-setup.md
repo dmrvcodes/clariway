@@ -11,13 +11,14 @@ already contains its public Firebase web configuration in `src/firebase/app.ts`.
 
 ## 2. Enable App Check development mode
 
-Firebase AI Logic requires App Check. In the project root, create the ignored
-file `.env.local` with:
+Cloud requests through Firebase AI Logic require App Check. On-device inference
+uses a separate Firebase app instance without App Check and needs none of this
+setup. In the project root, create the ignored file `.env.local` with:
 
     VITE_APP_CHECK_DEBUG=true
 
-Build the extension and load `dist` from `chrome://extensions`. Open the
-extension's service-worker inspector, trigger either **Test on-device AI** or
+Build the extension and load `dist` from `chrome://extensions`. Open the side
+panel's inspector (right-click the panel, **Inspect**), trigger
 **Test cloud AI**, and copy the App Check debug token Firebase logs there.
 
 In Firebase Console, go to **Build > App Check > Apps > Manage debug tokens**.
