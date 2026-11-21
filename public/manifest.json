@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Clariway",
+  "description": "Accessible image descriptions, speech, and transcripts with hybrid AI.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "139",
+  "permissions": ["activeTab", "scripting", "sidePanel", "storage", "tts"],
+  "background": {
+    "service_worker": "assets/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open Clariway"
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "commands": {
+    "open-clariway": {
+      "suggested_key": {
+        "default": "Alt+Shift+C",
+        "mac": "Command+Shift+C"
+      },
+      "description": "Open Clariway"
+    }
+  }
+}
