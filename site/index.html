@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Clariway is a privacy-first hybrid AI accessibility assistant for Chrome."
+    />
+    <title>Clariway — Hybrid AI accessibility for Chrome</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">FIREBASE #BUILDHYBRIDAI 2026</p>
+      <h1>Clariway</h1>
+      <p class="lede">
+        A privacy-first Chrome accessibility assistant for visual and spoken web content.
+      </p>
+
+      <div class="actions">
+        <a class="button primary" href="https://github.com/dmrvcodes/clariway">View source</a>
+        <a class="button secondary" href="https://github.com/dmrvcodes/clariway#local-build">Install locally</a>
+      </div>
+
+      <section aria-labelledby="how-it-works">
+        <h2 id="how-it-works">Hybrid AI, with a visible privacy boundary</h2>
+        <ol>
+          <li><strong>Audit locally.</strong> Clariway finds missing image descriptions and media accessibility gaps in the active tab.</li>
+          <li><strong>Describe on device.</strong> Gemini Nano is used first when Chrome supports it; this path makes no Firebase request.</li>
+          <li><strong>Choose cloud explicitly.</strong> If cloud quality is needed, Clariway previews the exact crop and bounded context before any Firebase AI Logic request.</li>
+        </ol>
+      </section>
+
+      <section aria-labelledby="features">
+        <h2 id="features">Built for control</h2>
+        <ul>
+          <li>Reversible alt-text previews and page reading settings</li>
+          <li>Caption and transcript audits for audio and video</li>
+          <li>Local-first text-to-speech with network voices labelled</li>
+          <li>No analytics, no blanket host permissions, no silent cloud fallback</li>
+        </ul>
+      </section>
+
+      <p class="note">
+        Clariway is an unpacked Chrome extension for the hackathon build. Follow the
+        <a href="https://github.com/dmrvcodes/clariway#local-build">installation instructions</a>
+        to build it and load <code>dist</code> from <code>chrome://extensions</code>.
+      </p>
+    </main>
+  </body>
+</html>

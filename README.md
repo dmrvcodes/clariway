@@ -87,3 +87,11 @@ Delivery notes and acceptance checks:
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+## Judge site and CI
+
+Firebase Hosting serves the static judge page from `site/`; it does not host the
+extension runtime. GitHub Actions packages the unpacked extension and deploys the
+judge page only through the protected `firebase-hosting` environment. The CI
+workflow never receives Firebase App Check credentials. Cloud integration checks
+are manual and must use a separate protected environment and debug token.
