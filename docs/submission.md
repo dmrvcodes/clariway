@@ -74,6 +74,6 @@ explore privacy-reviewed live captioning without weakening explicit consent.
 
 ## Required links before submission
 
-- Public GitHub or GitLab repository: pending explicit publication approval.
+- Public source repository: https://github.com/dmrvcodes/clariway
 - Public YouTube demo, at most three minutes, in English: pending recording.
 - Optional hosted/testable extension URL: pending packaging decision.

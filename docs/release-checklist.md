@@ -16,7 +16,7 @@
 - [x] No tracked `.env.local`, debug token, browser profile data, or recorded
   secret pattern in the current diff.
 - [ ] Apache-2.0 is visible and README instructions work from a clean checkout.
-- [ ] Public repository created only after explicit approval.
+- [x] Public repository: https://github.com/dmrvcodes/clariway
 
 ## Chrome acceptance
 
