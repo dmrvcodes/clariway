@@ -1,9 +1,11 @@
 import {
   imageAltMutationSchema,
   pageContextSchema,
+  readingProfileSchema,
   type ExtensionRequest,
   type ExtensionResponse,
   type PageContext,
+  type ReadingProfile,
 } from "../core/messages";
 
 const openPanelForActiveTab = async (): Promise<void> => {
@@ -47,27 +49,33 @@ const sendContentRequest = async (
 ): Promise<PageContext> =>
   parsePageContextResponse(await chrome.tabs.sendMessage(tabId, request));
 
-const requestPageContext = async (): Promise<ExtensionResponse> => {
-  const tab = await getActiveWebTab();
+const sendContentMessage = async (
+  tabId: number,
+  request: ExtensionRequest,
+): Promise<unknown> => {
   try {
-    return {
-      ok: true,
-      data: await sendContentRequest(tab.id, { type: "GET_PAGE_CONTEXT" }),
-    };
+    return await chrome.tabs.sendMessage(tabId, request);
   } catch {
     try {
       await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
+        target: { tabId },
         files: ["assets/content.js"],
       });
     } catch {
       throw new Error("Open an HTTP or HTTPS page and try again.");
     }
-    return {
-      ok: true,
-      data: await sendContentRequest(tab.id, { type: "GET_PAGE_CONTEXT" }),
-    };
+    return chrome.tabs.sendMessage(tabId, request);
   }
+};
+
+const requestPageContext = async (): Promise<ExtensionResponse> => {
+  const tab = await getActiveWebTab();
+  return {
+    ok: true,
+    data: parsePageContextResponse(
+      await sendContentMessage(tab.id, { type: "GET_PAGE_CONTEXT" }),
+    ),
+  };
 };
 
 const captureVisibleTab = async (): Promise<ExtensionResponse> => {
@@ -103,6 +111,36 @@ const mutateImageAlt = async (
   return { ok: true, data: await sendContentRequest(tab.id, contentRequest) };
 };
 
+const mutateReadingProfile = async (
+  request: Extract<
+    ExtensionRequest,
+    { type: "APPLY_READING_PROFILE" | "RESET_READING_PROFILE" }
+  >,
+): Promise<ExtensionResponse> => {
+  const profile: ReadingProfile = request.type === "RESET_READING_PROFILE"
+    ? { textScale: 100, highContrast: false }
+    : readingProfileSchema.parse(request);
+  const tab = await getActiveWebTab();
+  const response = await sendContentMessage(tab.id, request);
+
+  if (!response || typeof response !== "object" || !("ok" in response)) {
+    throw new Error("Clariway received an invalid reading-profile response.");
+  }
+  if (response.ok !== true || !("data" in response)) {
+    throw new Error(
+      "error" in response && typeof response.error === "string"
+        ? response.error
+        : "Unable to update reading comfort.",
+    );
+  }
+
+  const parsed = readingProfileSchema.safeParse(response.data);
+  if (!parsed.success || parsed.data.textScale !== profile.textScale || parsed.data.highContrast !== profile.highContrast) {
+    throw new Error("Clariway received an invalid reading-profile response.");
+  }
+  return { ok: true, data: parsed.data };
+};
+
 const handleRequest = async (request: ExtensionRequest): Promise<ExtensionResponse> => {
   switch (request.type) {
     case "GET_ACTIVE_PAGE_CONTEXT":
@@ -112,6 +150,9 @@ const handleRequest = async (request: ExtensionRequest): Promise<ExtensionRespon
     case "APPLY_IMAGE_ALT":
     case "RESTORE_IMAGE_ALT":
       return mutateImageAlt(request);
+    case "APPLY_READING_PROFILE":
+    case "RESET_READING_PROFILE":
+      return mutateReadingProfile(request);
     case "OPEN_SIDE_PANEL":
       await openPanelForActiveTab();
       return { ok: true };

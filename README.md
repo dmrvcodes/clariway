@@ -6,9 +6,11 @@ Context-aware accessibility assistant built for the Firebase #BuildHybridAI
 Clariway audits up to the first 50 images, generates grounded English alt text
 for visible images, and applies reviewed descriptions as reversible tab-local
 previews. It also audits audio/video captions and transcript references, reads
-available English text-track cues aloud, and speaks selected English text. Page
-code is injected only after a user action through `activeTab`; the extension
-requests no blanket host permissions.
+available English text-track cues aloud, and speaks selected or bounded main-page
+English text. A reversible reading profile provides 100/125/150% page scaling,
+stronger contrast, and focus visibility. Page code is injected only after a
+user action through `activeTab`; the extension requests no blanket host
+permissions.
 
 ## Hybrid AI routing
 
@@ -27,6 +29,11 @@ behind the same consent step. The cloud call accepts only a consent object
 created by that click, which carries the approved payload. Every result shows
 the actual `inferenceSource` reported by Firebase.
 
+On-device generation is bounded to 45 seconds. If Chrome's local runtime stops
+responding, the panel recovers, nothing is sent, and the same review/consent
+flow is shown. A failed item also short-circuits the remaining local attempts in
+that batch instead of making the user wait through the same runtime failure.
+
 Two safeguards close gaps in the default SDK behavior (`@firebase/ai` 3.1.0):
 
 - Firebase AI Logic creates its on-device adapter only when Chrome exposes
@@ -41,6 +48,8 @@ labelled "network voice" are synthesized by an online service.
 
 ## Local build
 
+Requires Node.js 24.12 or newer.
+
 ```bash
 npm install
 npm run build
@@ -49,7 +58,8 @@ npm run build
 Audits, speech, and on-device descriptions work without Firebase setup.
 Cloud descriptions and **Test cloud AI** need Firebase AI Logic and App Check:
 follow [docs/firebase-setup.md](docs/firebase-setup.md). Do not commit
-`.env.local` or an App Check debug token.
+`.env.local` or an App Check debug token. The Firebase project must also have
+Gemini API free-tier access or billing enabled; App Check alone is not enough.
 
 Load the unpacked extension from `chrome://extensions`:
 
@@ -66,6 +76,13 @@ Delivery notes and acceptance checks:
 - [19 November foundation](docs/progress-2026-11-19.md)
 - [20 November hybrid image descriptions](docs/progress-2026-11-20.md)
 - [21 November media audit and cloud consent](docs/progress-2026-11-21.md)
+- [22–28 November delivery plan](docs/plan-2026-11-22-to-28.md)
+- [22–28 November implementation and acceptance](docs/progress-2026-11-22-to-28.md)
+- [Security and privacy model](docs/security.md)
+- [Platform roadmap](docs/platform-roadmap.md)
+- [Three-minute demo script](docs/demo-script.md)
+- [Devpost submission draft](docs/submission.md)
+- [28 November release checklist](docs/release-checklist.md)
 
 ## License
 

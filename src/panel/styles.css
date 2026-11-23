@@ -112,6 +112,15 @@ dl {
   margin: 0;
 }
 
+.routing-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.routing-stats dd {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
 .image-audit {
   display: grid;
   gap: 0.5rem;
@@ -414,12 +423,33 @@ dd {
   line-height: 1.45;
 }
 
-.voice-select {
+.voice-select,
+.control-label {
   display: grid;
   gap: 8px;
   color: #a9ddc1;
   font-size: 0.875rem;
   font-weight: 700;
+}
+
+.checkbox-control {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  line-height: 1.45;
+}
+
+.checkbox-control input {
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  accent-color: #b5f3d1;
+}
+
+.checkbox-control input:focus-visible {
+  outline: 4px solid #ffcb6b;
+  outline-offset: 3px;
 }
 
 select {

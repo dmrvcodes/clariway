@@ -12,7 +12,13 @@ type ContentRequest =
       type: "RESTORE_IMAGE_ALT";
       imageId: string;
       expectedSource: string;
-    };
+    }
+  | {
+      type: "APPLY_READING_PROFILE";
+      textScale: 100 | 125 | 150;
+      highContrast: boolean;
+    }
+  | { type: "RESET_READING_PROFILE" };
 type ImageState = "described" | "missing" | "ignored";
 type MediaState = "captioned" | "transcript" | "missing";
 type MediaTrackKind = "captions" | "subtitles" | "descriptions" | "chapters" | "metadata";
@@ -70,9 +76,11 @@ type PageData = {
 
 type ContentResponse =
   | { ok: true; data: PageData }
+  | { ok: true; data: ReadingProfile }
   | { ok: false; error: string };
 
 type OriginalAlt = { hadAttribute: boolean; value: string };
+type ReadingProfile = { textScale: 100 | 125 | 150; highContrast: boolean };
 
 const imageLimit = 50;
 const mediaLimit = 20;
@@ -80,6 +88,7 @@ const mainTextLimit = 6_000;
 const nearbyTextLimit = 500;
 const transcriptLimit = 6_000;
 const originalAlts = new WeakMap<HTMLImageElement, OriginalAlt>();
+const readingStyleId = "clariway-reading-profile";
 
 const normalizeText = (value: string): string => value.replace(/\s+/g, " ").trim();
 
@@ -362,6 +371,39 @@ const restoreImageAlt = (
   return getPageContext();
 };
 
+const applyReadingProfile = (profile: ReadingProfile): ReadingProfile => {
+  if (![100, 125, 150].includes(profile.textScale)) {
+    throw new Error("Unsupported text scale.");
+  }
+
+  let style = document.getElementById(readingStyleId);
+  if (!style) {
+    style = document.createElement("style");
+    style.id = readingStyleId;
+    style.textContent = `
+      html[data-clariway-text-scale="125"] { zoom: 1.25 !important; }
+      html[data-clariway-text-scale="150"] { zoom: 1.5 !important; }
+      html[data-clariway-high-contrast="true"] { filter: contrast(1.25) saturate(0.9) !important; }
+      html[data-clariway-high-contrast="true"] :focus-visible {
+        outline: 4px solid #ffbf47 !important;
+        outline-offset: 3px !important;
+      }
+    `;
+    (document.head ?? document.documentElement).append(style);
+  }
+
+  document.documentElement.dataset.clariwayTextScale = String(profile.textScale);
+  document.documentElement.dataset.clariwayHighContrast = String(profile.highContrast);
+  return { textScale: profile.textScale, highContrast: profile.highContrast };
+};
+
+const resetReadingProfile = (): ReadingProfile => {
+  document.getElementById(readingStyleId)?.remove();
+  delete document.documentElement.dataset.clariwayTextScale;
+  delete document.documentElement.dataset.clariwayHighContrast;
+  return { textScale: 100, highContrast: false };
+};
+
 chrome.runtime.onMessage.addListener(
   (request: ContentRequest, _sender, sendResponse: (response: ContentResponse) => void) => {
     try {
@@ -374,6 +416,12 @@ chrome.runtime.onMessage.addListener(
           return false;
         case "RESTORE_IMAGE_ALT":
           sendResponse(restoreImageAlt(request));
+          return false;
+        case "APPLY_READING_PROFILE":
+          sendResponse({ ok: true, data: applyReadingProfile(request) });
+          return false;
+        case "RESET_READING_PROFILE":
+          sendResponse({ ok: true, data: resetReadingProfile() });
           return false;
       }
     } catch (error: unknown) {

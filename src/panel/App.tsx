@@ -14,6 +14,7 @@ import {
   type ImageAuditItem,
   type MediaAuditItem,
   type PageContext,
+  type ReadingProfile,
 } from "../core/messages";
 import {
   getEnglishVoices,
@@ -29,6 +30,7 @@ import {
   type ImageDescriptionResult,
   type InferencePreference,
 } from "../firebase/ai";
+import { normalizeAIServiceError } from "../firebase/errors";
 import "./styles.css";
 
 interface CloudRequest {
@@ -43,6 +45,11 @@ interface DescriptionEntry {
   applied: boolean;
   /** Set while the user decides whether this image may be sent to the cloud. */
   cloudRequest: CloudRequest | null;
+}
+
+interface RoutingActivity {
+  onDeviceResults: number;
+  approvedCloudSends: number;
 }
 
 type ImageOutcome = "described" | "needs-consent";
@@ -127,6 +134,14 @@ export function App() {
   const [isBatching, setIsBatching] = useState(false);
   const [descriptions, setDescriptions] = useState<Record<string, DescriptionEntry>>({});
   const [focusTargetId, setFocusTargetId] = useState<string | null>(null);
+  const [readingProfile, setReadingProfile] = useState<ReadingProfile>({
+    textScale: 100,
+    highContrast: false,
+  });
+  const [routingActivity, setRoutingActivity] = useState<RoutingActivity>({
+    onDeviceResults: 0,
+    approvedCloudSends: 0,
+  });
 
   useEffect(() => {
     void getEnglishVoices()
@@ -150,6 +165,7 @@ export function App() {
       const pageContext = await getActivePageContext();
       setContext(pageContext);
       setDescriptions({});
+      setRoutingActivity({ onDeviceResults: 0, approvedCloudSends: 0 });
       setStatus("Page context ready");
     } catch (error: unknown) {
       setContext(null);
@@ -179,6 +195,12 @@ export function App() {
               cloudRequest: { reason: outcome.reason, detail: outcome.detail },
             },
     }));
+    if (outcome.kind === "described") {
+      setRoutingActivity((current) => ({
+        ...current,
+        onDeviceResults: current.onDeviceResults + 1,
+      }));
+    }
     return outcome.kind === "described" ? "described" : "needs-consent";
   };
 
@@ -236,7 +258,7 @@ export function App() {
       }
 
       const screenshot = await captureVisibleTab();
-      const device = await preparation;
+      let device = await preparation;
       let described = 0;
       let needsConsent = 0;
       const failures: string[] = [];
@@ -251,7 +273,18 @@ export function App() {
         try {
           const outcome = await describeOnDevice(page, item, screenshot, device);
           if (outcome === "described") described += 1;
-          else needsConsent += 1;
+          else {
+            needsConsent += 1;
+            // Do not make the user wait through the same local runtime failure
+            // for every item in the batch. The remaining consent cards are
+            // prepared locally and still require an explicit cloud decision.
+            if (device.deviceReady) {
+              device = {
+                deviceReady: false,
+                error: new Error("Skipped after the previous on-device AI failure."),
+              };
+            }
+          }
         } catch (error: unknown) {
           failures.push(error instanceof Error ? error.message : `Image ${index + 1} failed.`);
         }
@@ -275,6 +308,10 @@ export function App() {
 
     // Created only from this click. It carries the exact payload shown in the card.
     const consent = grantCloudConsent(entry.input);
+    setRoutingActivity((current) => ({
+      ...current,
+      approvedCloudSends: current.approvedCloudSends + 1,
+    }));
     setBusyImageId(item.id);
     setStatus("Sending the approved crop and page text to the cloud model");
 
@@ -291,7 +328,7 @@ export function App() {
       setFocusTargetId(`description-${item.id}`);
       setStatus("Cloud description ready for review");
     } catch (error: unknown) {
-      setStatus(error instanceof Error ? error.message : "The cloud model could not describe this image.");
+      setStatus(normalizeAIServiceError(error).message);
     } finally {
       setBusyImageId(null);
     }
@@ -370,12 +407,31 @@ export function App() {
   };
 
   const speakSelection = async () => {
-    const text = context?.selectedText;
-    if (!text) {
-      setStatus("Select English text on the page first.");
-      return;
+    try {
+      const page = await getActivePageContext();
+      setContext(page);
+      if (!page.selectedText) {
+        setStatus("Select English text on the page first.");
+        return;
+      }
+      await startSpeech(page.selectedText, "Speaking selected text");
+    } catch (error: unknown) {
+      setStatus(error instanceof Error ? error.message : "Unable to read the current selection.");
     }
-    await startSpeech(text, "Speaking selected text");
+  };
+
+  const speakPage = async () => {
+    try {
+      const page = await getActivePageContext();
+      setContext(page);
+      if (!page.mainText) {
+        setStatus("No readable main content was found on this page.");
+        return;
+      }
+      await startSpeech(page.mainText, "Speaking the current page");
+    } catch (error: unknown) {
+      setStatus(error instanceof Error ? error.message : "Unable to read the current page.");
+    }
   };
 
   const speakTranscript = async (item: MediaAuditItem) => {
@@ -392,6 +448,29 @@ export function App() {
     setStatus("Speech stopped");
   };
 
+  const updateReadingProfile = async (reset: boolean) => {
+    const requested: ReadingProfile = reset
+      ? { textScale: 100, highContrast: false }
+      : readingProfile;
+    setStatus(reset ? "Restoring the page's original presentation" : "Applying reading comfort locally");
+
+    try {
+      const response = await sendExtensionRequest(
+        reset
+          ? { type: "RESET_READING_PROFILE" }
+          : { type: "APPLY_READING_PROFILE", ...requested },
+      );
+      if (!response.ok) throw new Error(response.error);
+      if (!("data" in response) || !("textScale" in response.data)) {
+        throw new Error("No reading-profile state returned.");
+      }
+      setReadingProfile(response.data);
+      setStatus(reset ? "Original page presentation restored" : "Reading comfort applied on this device");
+    } catch (error: unknown) {
+      setStatus(error instanceof Error ? error.message : "Unable to update reading comfort.");
+    }
+  };
+
   const runProbe = async (preference: InferencePreference) => {
     setIsProbing(true);
     setStatus(preference === "on-device" ? "Preparing the on-device model" : "Requesting cloud inference");
@@ -401,7 +480,13 @@ export function App() {
       });
       setStatus(`AI ready via ${formatSource(result.source)}: ${result.text}`);
     } catch (error: unknown) {
-      setStatus(error instanceof Error ? error.message : "AI setup needs Firebase AI Logic and App Check.");
+      setStatus(
+        preference === "in-cloud"
+          ? normalizeAIServiceError(error).message
+          : error instanceof Error
+            ? error.message
+            : "The on-device model could not start.",
+      );
     } finally {
       setIsProbing(false);
     }
@@ -538,6 +623,7 @@ export function App() {
         <div className="actions">
           <button type="button" disabled={isBusy} onClick={inspectPage}>Audit current page</button>
           <button type="button" className="secondary" onClick={speakSelection}>Speak selected English</button>
+          <button type="button" className="secondary" onClick={speakPage}>Speak current page</button>
           {isSpeaking && <button type="button" className="secondary" onClick={stopSpeech}>Stop speaking</button>}
         </div>
       </section>
@@ -641,6 +727,55 @@ export function App() {
           )}
         </section>
       )}
+
+      <section aria-labelledby="reading-title">
+        <h2 id="reading-title">Reading comfort</h2>
+        <p className="hint">Visual changes stay in this tab and never leave the browser.</p>
+        <label className="control-label">
+          Page scale
+          <select
+            value={readingProfile.textScale}
+            onChange={(event) => setReadingProfile((current) => ({
+              ...current,
+              textScale: Number(event.target.value) as ReadingProfile["textScale"],
+            }))}
+          >
+            <option value={100}>100%</option>
+            <option value={125}>125%</option>
+            <option value={150}>150%</option>
+          </select>
+        </label>
+        <label className="checkbox-control">
+          <input
+            type="checkbox"
+            checked={readingProfile.highContrast}
+            onChange={(event) => setReadingProfile((current) => ({
+              ...current,
+              highContrast: event.target.checked,
+            }))}
+          />
+          Increase page contrast and focus visibility
+        </label>
+        <div className="actions">
+          <button type="button" disabled={isBusy} onClick={() => void updateReadingProfile(false)}>
+            Apply to this tab
+          </button>
+          <button type="button" className="secondary" disabled={isBusy} onClick={() => void updateReadingProfile(true)}>
+            Reset page presentation
+          </button>
+        </div>
+      </section>
+
+      <section aria-labelledby="routing-title">
+        <h2 id="routing-title">Privacy routing</h2>
+        <dl className="routing-stats">
+          <div><dt>On-device results</dt><dd>{routingActivity.onDeviceResults}</dd></div>
+          <div><dt>Approved cloud sends</dt><dd>{routingActivity.approvedCloudSends}</dd></div>
+        </dl>
+        <p className="hint">
+          Counts reset when you audit another page. Clariway sends no analytics or background telemetry.
+        </p>
+      </section>
 
       <section aria-labelledby="diagnostics-title">
         <h2 id="diagnostics-title">AI diagnostics</h2>

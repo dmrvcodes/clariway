@@ -54,6 +54,11 @@ export const mediaAuditSchema = z.object({
   items: z.array(mediaAuditItemSchema),
 });
 
+export const readingProfileSchema = z.object({
+  textScale: z.union([z.literal(100), z.literal(125), z.literal(150)]),
+  highContrast: z.boolean(),
+});
+
 export const pageContextSchema = z.object({
   title: z.string(),
   url: z.string().url(),
@@ -80,6 +85,7 @@ export type ImageAuditItem = z.infer<typeof imageAuditItemSchema>;
 export type MediaAuditItem = z.infer<typeof mediaAuditItemSchema>;
 export type MediaTextTrack = z.infer<typeof mediaTextTrackSchema>;
 export type ImageAltMutation = z.infer<typeof imageAltMutationSchema>;
+export type ReadingProfile = z.infer<typeof readingProfileSchema>;
 
 export interface VisibleTabCapture {
   kind: "visible-tab-capture";
@@ -92,10 +98,13 @@ export type ExtensionRequest =
   | { type: "CAPTURE_VISIBLE_TAB" }
   | ({ type: "APPLY_IMAGE_ALT" } & ImageAltMutation)
   | ({ type: "RESTORE_IMAGE_ALT" } & Omit<ImageAltMutation, "altText">)
+  | ({ type: "APPLY_READING_PROFILE" } & ReadingProfile)
+  | { type: "RESET_READING_PROFILE" }
   | { type: "OPEN_SIDE_PANEL" };
 
 export type ExtensionResponse =
   | { ok: true; data: PageContext }
   | { ok: true; data: VisibleTabCapture }
+  | { ok: true; data: ReadingProfile }
   | { ok: true }
   | { ok: false; error: string };

@@ -34,6 +34,19 @@ Firebase's AI Logic setup normally enables this automatically. Once both
 diagnostics succeed, verify that status and re-run them, including the on-device
 path on Chrome 139 or newer.
 
+## 4. Verify Gemini API project access
+
+App Check success does not guarantee that the Gemini Developer API accepts
+inference for the project. Run **Test cloud AI** after registering the debug
+token. If Firebase returns `403` with `project-unavailable`, the project's
+Gemini API free-tier access is unavailable. Enable Gemini API billing for the
+project or use another Firebase project with free-tier access, then rebuild and
+reload the extension.
+
+Do not change models to work around this response: `gemini-3.5-flash-lite` is a
+supported general-use multimodal model, and project access is rejected before
+model inference.
+
 ## Production note
 
 The debug provider is only for the hackathon development build. A public browser

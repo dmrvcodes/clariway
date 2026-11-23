@@ -25,12 +25,31 @@ export type OnDeviceOutcome<T> =
       detail: string;
     };
 
+export interface OnDeviceRoutingOptions {
+  /** Bounds an SDK call that currently has no cancellation API. */
+  timeoutMs?: number;
+}
+
+export const DEFAULT_ON_DEVICE_TIMEOUT_MS = 45_000;
+
+export class OnDeviceTimeoutError extends Error {
+  readonly code = "ON_DEVICE_TIMEOUT";
+
+  constructor(timeoutMs: number) {
+    super(
+      `On-device AI did not respond within ${Math.ceil(timeoutMs / 1_000)} seconds. Nothing was sent.`,
+    );
+    this.name = "OnDeviceTimeoutError";
+  }
+}
+
 const errorMessage = (error: unknown, fallback: string): string =>
   error instanceof Error && error.message ? error.message : fallback;
 
 export const describeOnDeviceFirst = async <T>(
   preparation: DevicePreparation,
   runOnDevice: () => Promise<T>,
+  options: OnDeviceRoutingOptions = {},
 ): Promise<OnDeviceOutcome<T>> => {
   if (!preparation.deviceReady) {
     return {
@@ -40,14 +59,26 @@ export const describeOnDeviceFirst = async <T>(
     };
   }
 
+  const timeoutMs = options.timeoutMs ?? DEFAULT_ON_DEVICE_TIMEOUT_MS;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new TypeError("The on-device timeout must be a positive finite number.");
+  }
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
-    return { kind: "described", result: await runOnDevice() };
+    const result = await new Promise<T>((resolve, reject) => {
+      timeoutId = setTimeout(() => reject(new OnDeviceTimeoutError(timeoutMs)), timeoutMs);
+      void runOnDevice().then(resolve, reject);
+    });
+    return { kind: "described", result };
   } catch (error: unknown) {
     return {
       kind: "needs-cloud-consent",
       reason: "device-failed",
       detail: errorMessage(error, "On-device AI could not describe this image."),
     };
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
   }
 };
 

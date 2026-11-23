@@ -11,10 +11,15 @@ import {
   parseGeneratedAltText,
 } from "../src/core/alt-text.ts";
 import {
+  DEFAULT_ON_DEVICE_TIMEOUT_MS,
   describeOnDeviceFirst,
   grantCloudConsent,
 } from "../src/core/hybrid-routing.ts";
 import { calculateCropRegion } from "../src/core/image-crop.ts";
+import {
+  AIServiceError,
+  normalizeAIServiceError,
+} from "../src/firebase/errors.ts";
 
 const manifest = JSON.parse(await readFile("dist/manifest.json", "utf8"));
 
@@ -135,6 +140,15 @@ const backgroundChrome = {
           },
         };
       }
+      if (request.type === "APPLY_READING_PROFILE") {
+        return {
+          ok: true,
+          data: { textScale: request.textScale, highContrast: request.highContrast },
+        };
+      }
+      if (request.type === "RESET_READING_PROFILE") {
+        return { ok: true, data: { textScale: 100, highContrast: false } };
+      }
       return { ok: true, data: backgroundPageContext };
     },
   },
@@ -193,6 +207,18 @@ const applyResponse = await new Promise((resolve) => {
 assert.equal(applyResponse.ok, true, JSON.stringify(applyResponse));
 assert.equal(applyResponse.data.imageAudit.missing, 0);
 assert.equal(forwardedContentRequests.at(-1).type, "APPLY_IMAGE_ALT");
+
+const readingProfileResponse = await new Promise((resolve) => {
+  backgroundListeners[0](
+    { type: "APPLY_READING_PROFILE", textScale: 150, highContrast: true },
+    {},
+    resolve,
+  );
+});
+assert.deepEqual(readingProfileResponse, {
+  ok: true,
+  data: { textScale: 150, highContrast: true },
+});
 
 if (previousChrome === undefined) {
   delete globalThis.chrome;
@@ -352,6 +378,31 @@ assert.equal(restoreContentResponse.ok, true, JSON.stringify(restoreContentRespo
 assert.equal(restoreContentResponse.data.imageAudit.missing, 2);
 assert.equal(window.document.querySelector('img[src="missing.jpg"]').hasAttribute("alt"), false);
 
+let readingContentResponse;
+listeners[0](
+  { type: "APPLY_READING_PROFILE", textScale: 125, highContrast: true },
+  {},
+  (value) => {
+    readingContentResponse = value;
+  },
+);
+assert.equal(readingContentResponse.ok, true);
+assert.equal(readingContentResponse.data.textScale, 125);
+assert.equal(readingContentResponse.data.highContrast, true);
+assert.equal(window.document.documentElement.dataset.clariwayTextScale, "125");
+assert.equal(window.document.documentElement.dataset.clariwayHighContrast, "true");
+assert.ok(window.document.getElementById("clariway-reading-profile"));
+
+listeners[0]({ type: "RESET_READING_PROFILE" }, {}, (value) => {
+  readingContentResponse = value;
+});
+assert.equal(readingContentResponse.ok, true);
+assert.equal(readingContentResponse.data.textScale, 100);
+assert.equal(readingContentResponse.data.highContrast, false);
+assert.equal(window.document.documentElement.dataset.clariwayTextScale, undefined);
+assert.equal(window.document.documentElement.dataset.clariwayHighContrast, undefined);
+assert.equal(window.document.getElementById("clariway-reading-profile"), null);
+
 assert.deepEqual(
   calculateCropRegion(
     { x: -10, y: 20, width: 110, height: 80 },
@@ -387,6 +438,21 @@ assert.deepEqual(
 assert.throws(
   () => parseGeneratedAltText('{"altText":""}'),
   InvalidGeneratedAltTextError,
+);
+
+const projectAccessError = normalizeAIServiceError(
+  new Error("[403] The Gemini API free tier is not available for this project. (project-unavailable)"),
+);
+assert.ok(projectAccessError instanceof AIServiceError);
+assert.equal(projectAccessError.code, "PROJECT_ACCESS_DENIED");
+assert.match(projectAccessError.message, /Enable Gemini API billing/);
+assert.equal(
+  normalizeAIServiceError(new Error("[429] RESOURCE_EXHAUSTED")).code,
+  "RATE_LIMITED",
+);
+assert.equal(
+  normalizeAIServiceError(new Error("Network connection failed")).message,
+  "Network connection failed",
 );
 
 // The consent card shows exactly the normalized text the model would receive.
@@ -433,6 +499,23 @@ assert.deepEqual(
   }),
   { kind: "needs-cloud-consent", reason: "device-failed", detail: "The on-device prompt failed." },
 );
+assert.equal(DEFAULT_ON_DEVICE_TIMEOUT_MS, 45_000);
+assert.deepEqual(
+  await describeOnDeviceFirst(
+    { deviceReady: true },
+    () => new Promise(() => undefined),
+    { timeoutMs: 5 },
+  ),
+  {
+    kind: "needs-cloud-consent",
+    reason: "device-failed",
+    detail: "On-device AI did not respond within 1 seconds. Nothing was sent.",
+  },
+);
+await assert.rejects(
+  describeOnDeviceFirst({ deviceReady: true }, runOnDevice, { timeoutMs: 0 }),
+  /positive finite number/,
+);
 
 // Consent carries a frozen copy of only the approved fields.
 const consentSource = {
@@ -468,5 +551,13 @@ assert.match(aiSource, /InferenceMode\.ONLY_IN_CLOUD/);
 assert.match(aiSource, /\(globalThis as \{ LanguageModel\?: unknown \}\)\.LanguageModel/);
 // On-device inference uses an app instance that never initializes App Check.
 assert.match(aiSource, /getAI\(onDeviceFirebaseApp,/);
+
+const panelSource = await readFile("src/panel/App.tsx", "utf8");
+assert.match(panelSource, /Approved cloud sends/);
+assert.match(panelSource, /approvedCloudSends: current\.approvedCloudSends \+ 1/);
+assert.ok(
+  panelSource.indexOf("approvedCloudSends: current.approvedCloudSends + 1") >
+    panelSource.indexOf("const consent = grantCloudConsent"),
+);
 
 console.log("Clariway build, consent-gated hybrid routing, media accessibility, and reversible DOM checks passed.");
