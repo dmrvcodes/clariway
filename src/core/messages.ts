@@ -80,11 +80,23 @@ export const imageAltMutationSchema = z.object({
   altText: z.string().trim().min(1).max(500).optional(),
 });
 
+const applyImageAltRequestSchema = z.object({
+  type: z.literal("APPLY_IMAGE_ALT"),
+  imageId: z.string().regex(/^image-\d+$/u),
+  expectedSource: z.string().min(1),
+  altText: z.string().trim().min(1).max(500),
+});
+
+const restoreImageAltRequestSchema = z.object({
+  type: z.literal("RESTORE_IMAGE_ALT"),
+  imageId: z.string().regex(/^image-\d+$/u),
+  expectedSource: z.string().min(1),
+});
+
 export type PageContext = z.infer<typeof pageContextSchema>;
 export type ImageAuditItem = z.infer<typeof imageAuditItemSchema>;
 export type MediaAuditItem = z.infer<typeof mediaAuditItemSchema>;
 export type MediaTextTrack = z.infer<typeof mediaTextTrackSchema>;
-export type ImageAltMutation = z.infer<typeof imageAltMutationSchema>;
 export type ReadingProfile = z.infer<typeof readingProfileSchema>;
 
 export interface VisibleTabCapture {
@@ -92,15 +104,27 @@ export interface VisibleTabCapture {
   dataUrl: string;
 }
 
-export type ExtensionRequest =
-  | { type: "GET_PAGE_CONTEXT" }
-  | { type: "GET_ACTIVE_PAGE_CONTEXT" }
-  | { type: "CAPTURE_VISIBLE_TAB" }
-  | ({ type: "APPLY_IMAGE_ALT" } & ImageAltMutation)
-  | ({ type: "RESTORE_IMAGE_ALT" } & Omit<ImageAltMutation, "altText">)
-  | ({ type: "APPLY_READING_PROFILE" } & ReadingProfile)
-  | { type: "RESET_READING_PROFILE" }
-  | { type: "OPEN_SIDE_PANEL" };
+export const extensionRequestSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("GET_ACTIVE_PAGE_CONTEXT") }),
+  z.object({ type: z.literal("CAPTURE_VISIBLE_TAB") }),
+  applyImageAltRequestSchema,
+  restoreImageAltRequestSchema,
+  z.object({ type: z.literal("APPLY_READING_PROFILE") }).merge(readingProfileSchema),
+  z.object({ type: z.literal("RESET_READING_PROFILE") }),
+  z.object({ type: z.literal("OPEN_SIDE_PANEL") }),
+]);
+
+export type ExtensionRequest = z.infer<typeof extensionRequestSchema>;
+
+export const contentRequestSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("GET_PAGE_CONTEXT") }),
+  applyImageAltRequestSchema,
+  restoreImageAltRequestSchema,
+  z.object({ type: z.literal("APPLY_READING_PROFILE") }).merge(readingProfileSchema),
+  z.object({ type: z.literal("RESET_READING_PROFILE") }),
+]);
+
+export type ContentRequest = z.infer<typeof contentRequestSchema>;
 
 export type ExtensionResponse =
   | { ok: true; data: PageContext }

@@ -1,7 +1,9 @@
 import {
+  extensionRequestSchema,
   imageAltMutationSchema,
   pageContextSchema,
   readingProfileSchema,
+  type ContentRequest,
   type ExtensionRequest,
   type ExtensionResponse,
   type PageContext,
@@ -45,13 +47,13 @@ const parsePageContextResponse = (response: unknown): PageContext => {
 
 const sendContentRequest = async (
   tabId: number,
-  request: ExtensionRequest,
+  request: ContentRequest,
 ): Promise<PageContext> =>
   parsePageContextResponse(await chrome.tabs.sendMessage(tabId, request));
 
 const sendContentMessage = async (
   tabId: number,
-  request: ExtensionRequest,
+  request: ContentRequest,
 ): Promise<unknown> => {
   try {
     return await chrome.tabs.sendMessage(tabId, request);
@@ -96,7 +98,7 @@ const mutateImageAlt = async (
   }
 
   const tab = await getActiveWebTab();
-  const contentRequest: ExtensionRequest = request.type === "APPLY_IMAGE_ALT"
+  const contentRequest: ContentRequest = request.type === "APPLY_IMAGE_ALT"
     ? {
         type: request.type,
         imageId: parsed.data.imageId,
@@ -113,7 +115,7 @@ const mutateImageAlt = async (
 
 const mutateReadingProfile = async (
   request: Extract<
-    ExtensionRequest,
+    ContentRequest,
     { type: "APPLY_READING_PROFILE" | "RESET_READING_PROFILE" }
   >,
 ): Promise<ExtensionResponse> => {
@@ -180,14 +182,24 @@ chrome.commands.onCommand.addListener(async (command) => {
 
 chrome.runtime.onMessage.addListener(
   (
-    request: ExtensionRequest,
-    _sender,
+    request: unknown,
+    sender,
     sendResponse: (response: ExtensionResponse) => void,
   ) => {
-    // GET_PAGE_CONTEXT is handled by the injected content script.
-    if (request.type === "GET_PAGE_CONTEXT") return false;
+    if (
+      sender.id !== chrome.runtime.id ||
+      sender.url !== chrome.runtime.getURL("panel.html")
+    ) {
+      return false;
+    }
 
-    void handleRequest(request)
+    const parsedRequest = extensionRequestSchema.safeParse(request);
+    if (!parsedRequest.success) {
+      sendResponse({ ok: false, error: "Unsupported Clariway request." });
+      return false;
+    }
+
+    void handleRequest(parsedRequest.data)
       .then(sendResponse)
       .catch((error: unknown) =>
         sendResponse({

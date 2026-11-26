@@ -28,7 +28,7 @@ export const normalizeAIServiceError = (error: unknown): AIServiceError => {
   if (/free tier is not available for this project|project-unavailable/iu.test(message)) {
     return new AIServiceError(
       "PROJECT_ACCESS_DENIED",
-      "Cloud AI is unavailable for this Firebase project. Enable Gemini API billing or use a project with free-tier access, then retry.",
+      "This Firebase project does not currently have Gemini API access. Use an authorized project with free-tier or hackathon quota access, then retry.",
       { cause: error },
     );
   }

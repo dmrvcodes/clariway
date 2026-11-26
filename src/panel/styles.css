@@ -63,6 +63,65 @@ section {
   gap: 10px;
 }
 
+.page-title {
+  overflow-wrap: anywhere;
+  color: #d5e2dc;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.report-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.report-summary dd {
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.empty-state {
+  padding: 12px;
+  border: 1px solid #5d8d73;
+  border-radius: 8px;
+  color: #e4f4e9;
+  background: #213d2e;
+  line-height: 1.45;
+}
+
+.secondary-tools,
+.advanced-tools {
+  border: 1px solid #52655c;
+  border-radius: 10px;
+  background: #1d2d26;
+}
+
+.secondary-tools > summary,
+.advanced-tools > summary {
+  min-height: 48px;
+  padding: 14px 16px;
+  color: #b5f3d1;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.secondary-tools > summary:focus-visible,
+.advanced-tools > summary:focus-visible {
+  outline: 4px solid #ffcb6b;
+  outline-offset: 2px;
+}
+
+.secondary-tools[open],
+.advanced-tools[open] {
+  display: grid;
+  gap: 18px;
+  padding: 0 16px 16px;
+}
+
+.secondary-tools section {
+  padding-top: 16px;
+  border-top: 1px solid #52655c;
+}
+
 .hybrid-action {
   display: grid;
   gap: 8px;
@@ -350,6 +409,13 @@ dl {
   line-height: 1.4;
 }
 
+.cloud-consent .local-result {
+  padding: 8px;
+  border-radius: 6px;
+  color: #173a29;
+  background: #e6f7ee;
+}
+
 .cloud-consent summary {
   color: #123d7a;
   font-weight: 750;
@@ -373,12 +439,6 @@ dl {
 .cloud-consent dd {
   color: #26364d;
   font-size: 0.85rem;
-}
-
-.cloud-consent .consent-meta {
-  margin-top: 6px;
-  color: #43516a;
-  font-size: 0.8rem;
 }
 
 .consent-actions {

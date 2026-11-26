@@ -47,4 +47,4 @@ jobs:
           name: clariway-extension-${{ github.sha }}
           path: clariway-extension.zip
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90

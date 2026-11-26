@@ -6,27 +6,28 @@ Clariway
 
 ## Tagline
 
-Privacy-first hybrid AI that makes visual and spoken web content easier to access.
+Reviewable, privacy-first image descriptions for people who use screen readers.
 
 ## Inspiration
 
-Accessibility tools often force an uncomfortable trade-off: keep sensitive page
-content local and accept limited capability, or send it to a powerful cloud model
-without a clear boundary. Clariway makes that boundary part of the interface.
+People who use screen readers still encounter images with no alternative text.
+AI description tools can also send page content to the cloud before a user has
+seen what is included. Clariway treats image access and cloud-sharing control as
+one workflow.
 
 ## What it does
 
-Clariway is a Chrome accessibility companion for blind, low-vision, and
-hard-of-hearing users. It audits images, captions, subtitles, and transcript
-references on the active page. For visible images without alternative text, it
-crops only the relevant pixels and asks Gemini Nano for a concise English
-description on the device. The user can review and reversibly apply the result.
+Clariway is a Chrome accessibility companion for people who use screen readers.
+It audits up to 50 images on the active page and identifies images with no alt
+attribute. For a visible image, it captures and crops the relevant pixels in the
+browser, then asks Gemini Nano for a concise English description on-device. The
+user reviews the description before applying it as a reversible tab-only preview.
 
 When local AI is unavailable or the user wants a second opinion, Clariway shows
 the exact image crop and bounded page context that would be sent to Gemini through
-Firebase AI Logic. The cloud call is impossible until the user explicitly
-approves that payload. Clariway also reads selected or main-page English text,
-surfaces available transcripts, prefers local TTS voices, and provides reversible
+Firebase AI Logic. The user must explicitly approve that payload before the cloud
+call can start. Clariway also checks caption and transcript availability, reads
+selected or page text aloud, prefers local TTS voices, and provides reversible
 page scaling and contrast controls.
 
 ## How we used Firebase
@@ -60,7 +61,7 @@ We also found and mitigated a subtle SDK edge case: when Chrome does not expose
 
 ## Accomplishments
 
-- Real multimodal on-device descriptions with zero Firebase resources before consent.
+- Real multimodal on-device descriptions without Firebase network requests.
 - A cloud boundary the user can inspect, decline, and verify.
 - Bounded image/media audits with no blanket browsing permission.
 - Keyboard and screen-reader focus management after asynchronous AI state changes.
@@ -68,12 +69,12 @@ We also found and mitigated a subtle SDK edge case: when Chrome does not expose
 
 ## What is next
 
-Validate with blind, low-vision, and hard-of-hearing users; add signed Chromium
-packages; build Android and iOS adapters using the same routing contract; and
-explore privacy-reviewed live captioning without weakening explicit consent.
+Validate the image workflow with screen-reader users, add more Chromium browser
+packages, and explore mobile adapters using the same consent contract.
 
 ## Required links before submission
 
 - Public source repository: https://github.com/dmrvcodes/clariway
-- Public YouTube demo, at most three minutes, in English: pending recording.
-- Optional hosted/testable extension URL: pending packaging decision.
+- Public Chrome build: add a versioned GitHub Release URL after the release package is published.
+- Hosted judge page: https://clariway-1262e.web.app/
+- Public YouTube demo, at most three minutes, in English or with English subtitles: pending recording.

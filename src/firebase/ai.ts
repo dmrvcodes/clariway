@@ -2,6 +2,7 @@ import {
   getAI,
   getGenerativeModel,
   GoogleAIBackend,
+  InferenceSource as InferenceSourceValue,
   InferenceMode,
   Schema,
   type AI,
@@ -28,6 +29,15 @@ export interface TextProbeResult {
 
 export interface ImageDescriptionResult extends GeneratedAltText {
   source: InferenceSource | "unknown";
+}
+
+export class InferenceSourceMismatchError extends Error {
+  constructor(expected: InferenceSource, actual: InferenceSource | undefined) {
+    super(
+      `Expected ${expected} inference, but Firebase AI Logic reported ${actual ?? "no source"}.`,
+    );
+    this.name = "InferenceSourceMismatchError";
+  }
 }
 
 const cloudModelName = "gemini-3.5-flash-lite";
@@ -133,6 +143,15 @@ const toImageDescriptionResult = (
   source: source ?? "unknown",
 });
 
+const assertInferenceSource = (
+  expected: InferenceSource,
+  actual: InferenceSource | undefined,
+): void => {
+  if (actual !== expected) {
+    throw new InferenceSourceMismatchError(expected, actual);
+  }
+};
+
 export const prepareOnDeviceImageModel = async (
   onProgress?: (progress: number) => void,
 ): Promise<DevicePreparation> => {
@@ -153,6 +172,7 @@ export const describeImageOnDevice = async (
   input: ImageDescriptionInput,
 ): Promise<ImageDescriptionResult> => {
   const result = await getOnDeviceImageModel().generateContent(buildImageParts(input));
+  assertInferenceSource(InferenceSourceValue.ON_DEVICE, result.response.inferenceSource);
   return toImageDescriptionResult(result.response.text(), result.response.inferenceSource);
 };
 
@@ -161,6 +181,7 @@ export const describeImageInCloud = async (
   consent: CloudConsent,
 ): Promise<ImageDescriptionResult> => {
   const result = await getCloudImageModel().generateContent(buildImageParts(consent.input));
+  assertInferenceSource(InferenceSourceValue.IN_CLOUD, result.response.inferenceSource);
   return toImageDescriptionResult(result.response.text(), result.response.inferenceSource);
 };
 
@@ -179,6 +200,10 @@ export const runTextProbe = async (
 
   if (preference === "on-device") await model.initializeDeviceModel(onProgress);
   const result = await model.generateContent("Reply with exactly: Clariway AI is ready.");
+  const expectedSource = preference === "on-device"
+    ? InferenceSourceValue.ON_DEVICE
+    : InferenceSourceValue.IN_CLOUD;
+  assertInferenceSource(expectedSource, result.response.inferenceSource);
 
   return {
     text: result.response.text().trim(),

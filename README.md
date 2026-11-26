@@ -1,16 +1,18 @@
 # Clariway
 
-Context-aware accessibility assistant built for the Firebase #BuildHybridAI
-2026 hackathon.
+Clariway helps people who use screen readers understand images that have no alt
+text. It audits the current page locally, creates a candidate description with
+Gemini Nano when available, and lets the user review and apply the change as a
+reversible tab-only preview.
 
-Clariway audits up to the first 50 images, generates grounded English alt text
-for visible images, and applies reviewed descriptions as reversible tab-local
-previews. It also audits audio/video captions and transcript references, reads
-available English text-track cues aloud, and speaks selected or bounded main-page
-English text. A reversible reading profile provides 100/125/150% page scaling,
-stronger contrast, and focus visibility. Page code is injected only after a
-user action through `activeTab`; the extension requests no blanket host
-permissions.
+Cloud inference is a user-controlled option. Before any cloud request, Clariway
+shows the exact image crop and bounded page context. Nothing is sent until the
+user approves that preview. The core flow is built around image access; caption
+audits, speech, and reading controls remain available as secondary tools.
+
+Page code is injected only after a user action through `activeTab`. Clariway
+requests no blanket host permissions and sends no analytics or background
+telemetry.
 
 ## Hybrid AI routing
 
@@ -51,15 +53,16 @@ labelled "network voice" are synthesized by an online service.
 Requires Node.js 24.12 or newer.
 
 ```bash
-npm install
-npm run build
+npm ci
+npm run verify
 ```
 
 Audits, speech, and on-device descriptions work without Firebase setup.
 Cloud descriptions and **Test cloud AI** need Firebase AI Logic and App Check:
 follow [docs/firebase-setup.md](docs/firebase-setup.md). Do not commit
-`.env.local` or an App Check debug token. The Firebase project must also have
-Gemini API free-tier access or billing enabled; App Check alone is not enough.
+`.env.local` or an App Check debug token. The Firebase project also needs Gemini
+API free-tier or hackathon quota access; App Check alone does not grant model
+access.
 
 Load the unpacked extension from `chrome://extensions`:
 
@@ -68,21 +71,20 @@ Load the unpacked extension from `chrome://extensions`:
 3. Choose the generated `dist` directory.
 4. Open a regular HTTP or HTTPS page and click the Clariway toolbar action.
 
+Versioned Chrome packages will appear in [GitHub Releases](https://github.com/dmrvcodes/clariway/releases)
+after a release tag is published. Until then, build from this checkout with the
+commands above and select the generated `dist` directory in **Load unpacked**.
+Release archives contain the built extension, not project credentials.
+
 On-device image descriptions need Chrome 139 or newer with the multimodal
 Prompt API available.
 
-Delivery notes and acceptance checks:
+## Project details
 
-- [19 November foundation](docs/progress-2026-11-19.md)
-- [20 November hybrid image descriptions](docs/progress-2026-11-20.md)
-- [21 November media audit and cloud consent](docs/progress-2026-11-21.md)
-- [22–28 November delivery plan](docs/plan-2026-11-22-to-28.md)
-- [22–28 November implementation and acceptance](docs/progress-2026-11-22-to-28.md)
+- [Firebase setup for local development](docs/firebase-setup.md)
 - [Security and privacy model](docs/security.md)
-- [Platform roadmap](docs/platform-roadmap.md)
 - [Three-minute demo script](docs/demo-script.md)
 - [Devpost submission draft](docs/submission.md)
-- [28 November release checklist](docs/release-checklist.md)
 
 ## License
 
@@ -90,8 +92,8 @@ Apache-2.0. See [LICENSE](LICENSE).
 
 ## Judge site and CI
 
-Firebase Hosting serves the static judge page from `site/`; it does not host the
-extension runtime. GitHub Actions packages the unpacked extension and deploys the
-judge page only through the protected `firebase-hosting` environment. The CI
-workflow never receives Firebase App Check credentials. Cloud integration checks
-are manual and must use a separate protected environment and debug token.
+Firebase Hosting serves the judge page from `site/`; it does not host the
+extension runtime. GitHub Actions builds a judge-downloadable package from a
+version tag and deploys the judge page only through the protected
+`firebase-hosting` environment. The quality workflow never receives Firebase
+App Check credentials.

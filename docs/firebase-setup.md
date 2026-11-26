@@ -38,14 +38,13 @@ path on Chrome 139 or newer.
 
 App Check success does not guarantee that the Gemini Developer API accepts
 inference for the project. Run **Test cloud AI** after registering the debug
-token. If Firebase returns `403` with `project-unavailable`, the project's
-Gemini API free-tier access is unavailable. Enable Gemini API billing for the
-project or use another Firebase project with free-tier access, then rebuild and
-reload the extension.
+token. If Firebase returns `403` with `project-unavailable`, the project does
+not currently have Gemini Developer API access. Use hackathon quota or an
+authorized Firebase project with free-tier access, then rebuild and reload the
+extension. App Check and model access are separate checks.
 
-Do not change models to work around this response: `gemini-3.5-flash-lite` is a
-supported general-use multimodal model, and project access is rejected before
-model inference.
+Do not change models to work around this response: project access is rejected
+before model inference.
 
 ## Production note
 

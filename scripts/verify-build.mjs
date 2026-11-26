@@ -87,6 +87,10 @@ const backgroundChrome = {
   },
   commands: { onCommand: { addListener() {} } },
   runtime: {
+    id: "clariway-test-extension",
+    getURL(path) {
+      return `chrome-extension://clariway-test-extension/${path}`;
+    },
     onMessage: {
       addListener(listener) {
         backgroundListeners.push(listener);
@@ -170,7 +174,10 @@ assert.deepEqual(openedPanelTargets, [{ tabId: 42 }]);
 const backgroundResponse = await new Promise((resolve) => {
   const keepsChannelOpen = backgroundListeners[0](
     { type: "GET_ACTIVE_PAGE_CONTEXT" },
-    {},
+    {
+      id: "clariway-test-extension",
+      url: "chrome-extension://clariway-test-extension/panel.html",
+    },
     resolve,
   );
   assert.equal(keepsChannelOpen, true);
@@ -182,7 +189,10 @@ assert.equal(injectionCount, 1);
 const captureResponse = await new Promise((resolve) => {
   const keepsChannelOpen = backgroundListeners[0](
     { type: "CAPTURE_VISIBLE_TAB" },
-    {},
+    {
+      id: "clariway-test-extension",
+      url: "chrome-extension://clariway-test-extension/panel.html",
+    },
     resolve,
   );
   assert.equal(keepsChannelOpen, true);
@@ -199,7 +209,10 @@ const applyResponse = await new Promise((resolve) => {
       expectedSource: "https://example.test/missing.png",
       altText: "Red jacket on a mannequin",
     },
-    {},
+    {
+      id: "clariway-test-extension",
+      url: "chrome-extension://clariway-test-extension/panel.html",
+    },
     resolve,
   );
   assert.equal(keepsChannelOpen, true);
@@ -211,7 +224,10 @@ assert.equal(forwardedContentRequests.at(-1).type, "APPLY_IMAGE_ALT");
 const readingProfileResponse = await new Promise((resolve) => {
   backgroundListeners[0](
     { type: "APPLY_READING_PROFILE", textScale: 150, highContrast: true },
-    {},
+    {
+      id: "clariway-test-extension",
+      url: "chrome-extension://clariway-test-extension/panel.html",
+    },
     resolve,
   );
 });
@@ -445,7 +461,7 @@ const projectAccessError = normalizeAIServiceError(
 );
 assert.ok(projectAccessError instanceof AIServiceError);
 assert.equal(projectAccessError.code, "PROJECT_ACCESS_DENIED");
-assert.match(projectAccessError.message, /Enable Gemini API billing/);
+assert.match(projectAccessError.message, /hackathon quota access/);
 assert.equal(
   normalizeAIServiceError(new Error("[429] RESOURCE_EXHAUSTED")).code,
   "RATE_LIMITED",
@@ -553,11 +569,16 @@ assert.match(aiSource, /\(globalThis as \{ LanguageModel\?: unknown \}\)\.Langua
 assert.match(aiSource, /getAI\(onDeviceFirebaseApp,/);
 
 const panelSource = await readFile("src/panel/App.tsx", "utf8");
-assert.match(panelSource, /Approved cloud sends/);
-assert.match(panelSource, /approvedCloudSends: current\.approvedCloudSends \+ 1/);
+const panelControllerSource = await readFile("src/panel/useClariwayPanel.ts", "utf8");
+const accessibilityToolsSource = await readFile(
+  "src/panel/components/AdditionalAccessibilityTools.tsx",
+  "utf8",
+);
+assert.match(accessibilityToolsSource, /Cloud consent given/);
+assert.match(panelControllerSource, /approvedCloudSends: current\.approvedCloudSends \+ 1/);
 assert.ok(
-  panelSource.indexOf("approvedCloudSends: current.approvedCloudSends + 1") >
-    panelSource.indexOf("const consent = grantCloudConsent"),
+  panelControllerSource.indexOf("approvedCloudSends: current.approvedCloudSends + 1") >
+    panelControllerSource.indexOf("const consent = grantCloudConsent"),
 );
 
 console.log("Clariway build, consent-gated hybrid routing, media accessibility, and reversible DOM checks passed.");

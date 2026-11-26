@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Clariway is a privacy-first hybrid AI accessibility assistant for Chrome."
+      content="Clariway helps screen-reader users understand images without alt text, with local-first AI and explicit cloud consent."
     />
-    <title>Clariway — Hybrid AI accessibility for Chrome</title>
+    <title>Clariway — Image access for screen-reader users</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -15,37 +15,45 @@
       <p class="eyebrow">FIREBASE #BUILDHYBRIDAI 2026</p>
       <h1>Clariway</h1>
       <p class="lede">
-        A privacy-first Chrome accessibility assistant for visual and spoken web content.
+        Help screen-reader users understand images that have no alt text.
+      </p>
+      <p class="intro">
+        Clariway checks the active page, asks Gemini Nano for image descriptions on-device,
+        and lets the user review every change. Cloud inference is available only after an
+        explicit review of the image crop and page context.
       </p>
 
       <div class="actions">
-        <a class="button primary" href="https://github.com/dmrvcodes/clariway">View source</a>
-        <a class="button secondary" href="https://github.com/dmrvcodes/clariway#local-build">Install locally</a>
+        <a class="button primary" href="https://github.com/dmrvcodes/clariway#local-build">Install the Chrome build</a>
+        <a class="button secondary" href="https://github.com/dmrvcodes/clariway">View source</a>
+        <a class="button secondary" href="https://github.com/dmrvcodes/clariway/releases">Tagged releases</a>
       </div>
 
       <section aria-labelledby="how-it-works">
-        <h2 id="how-it-works">Hybrid AI, with a visible privacy boundary</h2>
+        <h2 id="how-it-works">From missing alt text to a reviewed fix</h2>
         <ol>
-          <li><strong>Audit locally.</strong> Clariway finds missing image descriptions and media accessibility gaps in the active tab.</li>
-          <li><strong>Describe on device.</strong> Gemini Nano is used first when Chrome supports it; this path makes no Firebase request.</li>
-          <li><strong>Choose cloud explicitly.</strong> If cloud quality is needed, Clariway previews the exact crop and bounded context before any Firebase AI Logic request.</li>
+          <li><strong>Find.</strong> Scan the first 50 images in the active tab; page content stays in the browser.</li>
+          <li><strong>Describe.</strong> Generate an English alt-text candidate with Gemini Nano through Firebase AI Logic.</li>
+          <li><strong>Review.</strong> See the result and apply or undo it as a tab-only preview.</li>
+          <li><strong>Choose cloud.</strong> If local AI is unavailable or a second opinion is useful, inspect the exact payload before approving Gemini cloud inference.</li>
         </ol>
       </section>
 
       <section aria-labelledby="features">
-        <h2 id="features">Built for control</h2>
+        <h2 id="features">Privacy and accessibility by design</h2>
         <ul>
-          <li>Reversible alt-text previews and page reading settings</li>
-          <li>Caption and transcript audits for audio and video</li>
-          <li>Local-first text-to-speech with network voices labelled</li>
-          <li>No analytics, no blanket host permissions, no silent cloud fallback</li>
+          <li>Cloud calls use Firebase AI Logic and App Check.</li>
+          <li>No automatic cloud fallback and no page content sent before consent.</li>
+          <li>No analytics or blanket host permissions.</li>
+          <li>Caption audits, transcript reading, speech, and page reading controls are included.</li>
         </ul>
       </section>
 
       <p class="note">
-        Clariway is an unpacked Chrome extension for the hackathon build. Follow the
+        Clariway is a free, open-source Chrome extension for this hackathon build.
+        Gemini Nano requires a compatible Chrome 139+ environment. Follow the
         <a href="https://github.com/dmrvcodes/clariway#local-build">installation instructions</a>
-        to build it and load <code>dist</code> from <code>chrome://extensions</code>.
+        or check GitHub Releases for a versioned package when one is published.
       </p>
     </main>
   </body>

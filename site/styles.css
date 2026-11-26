@@ -23,10 +23,15 @@ main {
 h1 { margin: .25rem 0; font-size: clamp(3.5rem, 11vw, 7rem); letter-spacing: -.07em; }
 h2 { margin: 0 0 1rem; font-size: 1.2rem; }
 .lede { max-width: 43rem; color: #d6e7dd; font-size: clamp(1.25rem, 3vw, 1.65rem); line-height: 1.5; }
+.intro { max-width: 43rem; margin-top: 1rem; color: #d6e7dd; font-size: 1.05rem; line-height: 1.65; }
 .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin: 2.25rem 0 3rem; }
 .button { border-radius: .6rem; padding: .8rem 1rem; font-weight: 750; text-decoration: none; }
 .primary { background: #b3f5d3; color: #10211b; }
 .secondary { border: 1px solid #b3f5d3; color: #e9f9ef; }
+a:focus-visible { outline: 4px solid #ffcb6b; outline-offset: 4px; border-radius: .25rem; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}
 section { margin-top: 1.4rem; padding: 1.5rem; border: 1px solid #40745d; border-radius: 1rem; background: rgb(10 35 26 / 72%); }
 li { margin: .75rem 0; color: #e0efe6; line-height: 1.5; }
 .note { margin-top: 2rem; color: #b9cfc2; line-height: 1.6; }
